@@ -11,6 +11,10 @@
 * timer: Fix off-by-one-tick in timer period calculation [#491]
 * **Breaking** Update `smoltcp` to `0.12.0` (from `0.11.0`)
 * Examples use RTIC v2
+* **Breaking** Do not enable the `cortex-m/critical-section-single-core` feature. Applications
+  now select the `critical-section` implementation (e.g. by enabling that feature themselves)
+* **Breaking** Update `synopsys-usb-otg` to `0.5` (from `0.4`), which uses `critical-section`
+  instead of `cortex_m::interrupt::free`
 
 ## [v0.16.0] 2024-03-12
 
