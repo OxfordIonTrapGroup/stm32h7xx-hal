@@ -15,6 +15,7 @@
   now select the `critical-section` implementation (e.g. by enabling that feature themselves)
 * **Breaking** Update `synopsys-usb-otg` to `0.5` (from `0.4`), which uses `critical-section`
   instead of `cortex_m::interrupt::free`
+* ethernet: Use TX checksum offload
 
 ## [v0.16.0] 2024-03-12
 

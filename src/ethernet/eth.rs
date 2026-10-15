@@ -28,7 +28,7 @@ use crate::rcc::{rec, CoreClocks, ResetEnable};
 use crate::stm32;
 
 use smoltcp::{
-    phy::{self, DeviceCapabilities},
+    phy::{self, Checksum, DeviceCapabilities},
     time::Instant,
     wire::EthernetAddress,
 };
@@ -55,6 +55,7 @@ mod emac_consts {
     pub const EMAC_RDES3_PL: u32 = 0x0000_7FFF;
     pub const EMAC_RDES3_BUF1V: u32 = 0x0100_0000;
     pub const EMAC_TDES2_B1L: u32 = 0x0000_3FFF;
+    pub const EMAC_TDES3_CIC_FULL: u32 = 0x0003_0000;
     pub const EMAC_DES0_BUF1AP: u32 = 0xFFFF_FFFF;
 }
 use self::emac_consts::*;
@@ -158,7 +159,13 @@ impl<const TD: usize> TDesRing<TD> {
         self.td[x].tdes1 = 0; // Not used
         assert!(self.td[x].tdes2 & !EMAC_TDES2_B1L == 0); // Not used
         assert!(self.td[x].tdes2 & EMAC_TDES2_B1L > 0); // Length must be valid
-        self.td[x].tdes3 = 0;
+
+        // FL: Frame length (all of it is in buffer 1)
+        self.td[x].tdes3 = self.td[x].tdes2 & EMAC_TDES2_B1L;
+        // CIC: Insert the IPv4 header checksum and the TCP/UDP/ICMP checksum,
+        // including the pseudo-header (see `capabilities()`). Ignored for
+        // other frames.
+        self.td[x].tdes3 |= EMAC_TDES3_CIC_FULL;
         self.td[x].tdes3 |= EMAC_DES3_FD; // FD: Contains first buffer of packet
         self.td[x].tdes3 |= EMAC_DES3_LD; // LD: Contains last buffer of packet
         self.td[x].tdes3 |= EMAC_DES3_OWN; // Give the DMA engine ownership
@@ -842,6 +849,12 @@ impl<const TD: usize, const RD: usize> phy::Device for EthernetDMA<TD, RD> {
         // sans CRC (4), 1500 IP MTU
         caps.max_transmission_unit = 1514;
         caps.max_burst_size = Some(core::cmp::min(TD, RD));
+        // TDesRing::release sets up transmit checksum offload; still check
+        // received frames in software.
+        caps.checksum.ipv4 = Checksum::Rx;
+        caps.checksum.udp = Checksum::Rx;
+        caps.checksum.tcp = Checksum::Rx;
+        caps.checksum.icmpv4 = Checksum::Rx;
         caps
     }
 
